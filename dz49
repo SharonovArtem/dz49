@@ -1,0 +1,405 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace ConsoleApp17
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            CarService carService = new CarService();
+
+            carService.Work();
+        }
+    }
+
+    class CarService
+    {
+        private DataBase _dataBase =new DataBase();
+        private Queue<Car> _carsQueue = new Queue<Car>();
+        private WareHouse _wareHouse = new WareHouse();
+        private int _money = 0;
+
+        public void Work()
+        {
+            _wareHouse.AddDetails();
+            _dataBase.AddCrashTypes();
+            _dataBase.AddServiceTypes();
+            _dataBase.CreateCompatibilities();
+            AddCarsInQueue();
+
+            while(_carsQueue.Count > 0)
+            {
+                _carsQueue.Peek().ShowInfo();
+
+                _dataBase.ShowHint();
+
+                FixCar();
+            }
+        }
+
+        public void AddCarsInQueue()
+        {
+            int firstCarCrashNumber = 0;
+            int lastCarCrashNumber = 7;
+            int minimalCarMoney = 5000;
+            int maximalCarMoney = 10000;
+            int carNumber = 9;
+
+            _dataBase.AddCrashTypes();
+
+            for (int i = 0; i < carNumber; i++)
+            {
+                int numberOfCarCrash = UserUtils.GenerateRandomNumber(firstCarCrashNumber, lastCarCrashNumber);
+                int carMoney = UserUtils.GenerateRandomNumber(minimalCarMoney, maximalCarMoney);
+
+                Car car = new Car(_dataBase.ReturnCrashType(i), carMoney);
+
+                _carsQueue.Enqueue(car);
+            }
+        }
+
+        public void GetMoney(int money)
+        {
+            _money += money;
+        }
+
+        public void PayFine()
+        {
+            _money -= _dataBase.Fine;
+        }
+
+        public void FixCar()
+        {
+            Car car = _carsQueue.Peek();
+
+            Сompatibility сompatibility;
+
+            bool isSuccessfullyCombined = _dataBase.TryCombine(out сompatibility, car.CrashType, _wareHouse);
+
+            if (isSuccessfullyCombined == true && car.CheckMoney(_dataBase.ReturnPrice(сompatibility.Detail.Price, сompatibility.Service.Price)) == true)
+            {
+                GetMoney(car.GiveMoney(сompatibility.Detail.Price, сompatibility.Service.Price));
+
+                _carsQueue.Dequeue();
+            }
+            else if(isSuccessfullyCombined == false)
+            {
+                Console.WriteLine("Вы ошиблись с выборром");
+
+                car.GetMoney(_dataBase.Fine);
+
+                PayFine();
+            }
+            else if(car.CheckMoney(_dataBase.ReturnPrice(сompatibility.Detail.Price, сompatibility.Service.Price)) == false)
+            {
+                Console.WriteLine("У водителя нет денег на ремонт");
+
+                _carsQueue.Dequeue();
+            }
+        }
+    }
+
+    class DataBase
+    {
+        public int Fine { get; private set; } = 500;
+        private List<Сompatibility> _сompatibilities = new List<Сompatibility>();
+        private List<Service> _serviceList = new List<Service>();
+        private List<CrashType> _crashTypes = new List<CrashType>();
+        private List<Detail> _detailList = new List<Detail>();
+
+        public void ShowHint()
+        {
+            for (int i = 0; i < _сompatibilities.Count; i++)
+            {
+                Console.WriteLine(_сompatibilities[i].CrashType.Name);
+                Console.WriteLine(_сompatibilities[i].Detail.Name);
+                Console.WriteLine(_сompatibilities[i].Service.Name);
+            }
+        }
+
+        public bool TryCombine(out Сompatibility сompatibility, CrashType crashType, WareHouse wareHouse)
+        {
+            string userInputService = null;
+            string userInputDetail = null;
+
+            Console.WriteLine("Какая услуга нужна этой машине?");
+
+            userInputService = Console.ReadLine();
+
+            Console.WriteLine("Какая деталь нужна этой машине?");
+
+            userInputDetail = Console.ReadLine();
+
+            сompatibility = new Сompatibility(crashType, wareHouse.GiveDetail(userInputDetail), CheckService(userInputService));
+
+            for (int i = 0; i < _сompatibilities.Count - 1; i++)
+            {
+                if (_сompatibilities[i] == сompatibility)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public int ReturnPrice(int detailPrice, int servicePrice)
+        {
+            int sumPrice = detailPrice + servicePrice;
+
+            return sumPrice;
+        }
+
+        public CrashType ReturnCrashType(int index)
+        {
+            return _crashTypes[index];
+        }
+
+        public void AddCrashTypes()
+        {
+            _crashTypes.Add(new CrashType("В двигателе стучит что-то"));
+            _crashTypes.Add(new CrashType("Вот эта лампочка красненькая горит"));
+            _crashTypes.Add(new CrashType("Залили в отсек для масла оливковое"));
+            _crashTypes.Add(new CrashType("Бок поцарапали"));
+            _crashTypes.Add(new CrashType("Вкладыши"));
+            _crashTypes.Add(new CrashType("Колесо проткнули"));
+            _crashTypes.Add(new CrashType("Ведёт вправо"));
+        }
+
+        public Service CheckService(string userInput)
+        {
+            for (int i = 0; i < _crashTypes.Count; i++)
+            {
+                if (userInput == _serviceList[i].Name)
+                {
+                    return _serviceList[i];
+                }
+            }
+
+            return null;
+        }
+
+        public Detail CheckDetail(string userInput, WareHouse wareHouse)
+        {
+            for (int i = 0; i < wareHouse.ReturnDetailsCount() - 1; i++)
+            {
+                if (userInput == _detailList[i].Name)
+                {
+                    return _detailList[i];
+                }
+            }
+
+            return null;
+        }
+
+        public void AddServiceTypes()
+        {
+            _serviceList.Add(new Service("Поменять двигатель", 2000));
+            _serviceList.Add(new Service("Потушить лампочку", 2500));
+            _serviceList.Add(new Service("Поменять масло", 750));
+            _serviceList.Add(new Service("Закрасить царапину", 250));
+            _serviceList.Add(new Service("Поменять вкладыши", 1500));
+            _serviceList.Add(new Service("Поменять колесо", 1000));
+            _serviceList.Add(new Service("Поменять руль", 2000));
+        }
+
+        public void CreateDetailTypes(List<Detail> _detailTypes)
+        {
+            _detailTypes.Add(new Detail("Двигатель", 500));
+            _detailTypes.Add(new Detail("Свечи", 1500));
+            _detailTypes.Add(new Detail("Масло", 350));
+            _detailTypes.Add(new Detail("Краска", 200));
+            _detailTypes.Add(new Detail("Вкладыши", 450));
+            _detailTypes.Add(new Detail("Шина", 600));
+            _detailTypes.Add(new Detail("Руль", 300));
+        }
+
+        public void CreateCompatibilities()
+        {
+            List<Detail> detailTypes = new List<Detail>();
+
+            CreateDetailTypes(detailTypes);
+
+            for (int i = 0; i < _serviceList.Count; i++)
+            {
+                _сompatibilities.Add(new Сompatibility(_crashTypes[i], detailTypes[i], _serviceList[i]));
+            }
+        }
+    }
+
+    class Detail
+    {
+        public Detail(string name, int price)
+        {
+            Name = name;
+            Price = price;
+        }
+
+        public string Name { get; private set; }
+        public int Price { get; private set; }
+    }
+
+    class CrashType
+    {
+        public CrashType(string crashTypeName)
+        {
+            Name = crashTypeName;
+        }
+
+        public string Name { get; private set; }
+    }
+
+    class WareHouse
+    {
+        private DataBase _dataBase = new DataBase();
+        private List<Detail> _details = new List<Detail>();
+        private List<Detail> _detailTypes = new List<Detail>();
+
+        public void AddDetails()
+        {
+            int minimalNumberOfDetails = 3;
+            int maximalNumberOfDetails = 6;
+            int numberOfDetails;           
+
+            _dataBase.CreateDetailTypes(_detailTypes);
+
+            for (int i = 0; i < _detailTypes.Count; i++)
+            {
+                numberOfDetails = UserUtils.GenerateRandomNumber(minimalNumberOfDetails, maximalNumberOfDetails);
+
+                for(int j = 0; j < numberOfDetails; j++)
+                {
+                    _details.Add(_detailTypes[i]);
+                }   
+            }
+        }
+
+        public int ReturnDetailsCount()
+        {
+            return _details.Count;  
+        }
+
+        public bool CheckDetail(string userInput, out Detail detail)
+        {
+            for (int i = 0; i < _details.Count; i++)
+            {
+                if (_details[i].Name == userInput)
+                {
+                    detail = _details[i];
+
+                    return true;
+                }
+            }
+
+            detail = null;
+
+            return false;
+        }
+
+        public Detail ReturnDetail(int index)
+        {
+            Detail detail = _details[index];
+
+            return detail;
+        }
+
+        public Detail GiveDetail(string userInput)
+        {
+
+            if (CheckDetail(userInput, out Detail detail) == true)
+            {
+                return detail;
+            }
+
+            Console.WriteLine("Такой детали нет в списке");
+
+            return null;
+        }
+    }
+    
+    class Car
+    {
+        public Car(CrashType crashType, int money)
+        {
+            CrashType = crashType;
+            Money = money;
+        }
+
+        public void ShowInfo()
+        {
+            Console.WriteLine("Поломка в машине: " + CrashType.Name);
+            Console.WriteLine("Деньги водителя: " + Money);
+        }
+
+        public CrashType CrashType { get; private set; }
+        public int Money { get; private set; }
+
+        public int GiveMoney(int detailPrice, int servicePrice)
+        {
+            int priceSum = detailPrice + servicePrice;
+
+            Money -= priceSum;
+
+            return priceSum;
+        }
+
+        public void GetMoney(int fine)
+        {
+            Money += fine;
+        }
+
+        public bool CheckMoney(int money)
+        {
+            if (Money > money)
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    class Сompatibility
+    {
+        public Сompatibility(CrashType crashType, Detail detail, Service service)
+        {
+            CrashType = crashType;
+            Detail = detail;
+            Service = service;
+        }
+
+        public CrashType CrashType { get; private set; }
+        public Detail Detail { get; private set; }
+        public Service Service { get; private set; }
+    }
+
+    class Service
+    {
+        public Service(string name, int price)
+        {
+            Name = name;
+            Price = price;
+        }
+
+        public string Name { get; private set; }
+        public int Price { get; private set; }
+    }
+
+    class UserUtils
+    {
+        public static Random random = new Random();
+
+        public static int GenerateRandomNumber(int minimalNumber, int maximalNumber)
+        {
+            int number;
+
+            number = random.Next(minimalNumber, maximalNumber);
+
+            return number;
+        }
+    }
+}
